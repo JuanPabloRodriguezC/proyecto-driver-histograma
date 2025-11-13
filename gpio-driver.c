@@ -4,7 +4,6 @@
 
 #include <linix/proc_fs.h>
 #include <linux/slab.h>
-
 #include <asm/io.h>
 
 #define MAX_USER_SIZE 1024
@@ -92,27 +91,27 @@ ssize_t proc_write(struct file *file, const char __user *buf, size_t size, loff_
 }
 
 static const struct proc_ops fops = {
-    .proc_read = NULL,
-    .proc_write = NULL,
+    .proc_read = proc_read,
+    .proc_write = proc_write,
 };
 
 static int __init gpio_driver_init(void)
 {
 
-    gpio_registers = (int*)ioremap(BCM2837_GPIO_ADDRESSM PAGE_SIZE);
+    gpio_registers = (int*)ioremap(BCM2837_GPIO_ADDRESS, PAGE_SIZE);
 
     if (gpio_registers == NULL)
     {
         printk(KERN_ALERT "Error: Could not map GPIO registers\n");
-        return -ENOMEM;
+        return -1;
     }
 
 
     printk("Successfully mapped in GPIO memory\n");
-    proc = proc_create("gpio_driver", 0666, NULL, &fops);
+    proc = proc_create("my_gpio_driver", 0666, NULL, &fops);
     if (proc == NULL) {
         printk(KERN_ALERT "Error: Could not initialize /proc/gpio_driver\n");
-        return -ENOMEM;
+        return -1;
     }
 
     return 0;
@@ -130,7 +129,7 @@ module_init(gpio_driver_init);
 module_exit(gpio_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("Operativos");
 MODULE_DESCRIPTION("A simple GPIO driver example");;
 MODULE_VERSION("1.0");;
 
