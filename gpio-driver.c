@@ -2,7 +2,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linix/proc_fs.h>
+#include <linux/proc_fs.h>
 #include <linux/slab.h>
 #include <asm/io.h>
 
@@ -32,7 +32,7 @@ static void gpio_pin_on(unsigned int pin)
 static void gpio_pin_off(unsigned int pin)
 {
     unsigned int* gpio_off_register = (unsigned int*)((char*)gpio_registers + 0x28);
-    gpio_off_register |= (1 << pin);
+    *gpio_off_register |= (1 << pin);
     return;
 }
 
@@ -64,7 +64,7 @@ ssize_t proc_write(struct file *file, const char __user *buf, size_t size, loff_
         return size;
     }
 
-    if (pin > 21 || pin <-0){
+    if (pin > 21 || pin < 0){
         printk("Invalid pin number. Use a pin between 0 and 21.\n");
         return size;
     }
@@ -122,7 +122,7 @@ static void __exit gpio_driver_exit(void)
 {
     proc_remove(proc);
     printk("GPIO Driver Exited\n");
-    return
+    return;
 }
 
 module_init(gpio_driver_init);
@@ -130,6 +130,6 @@ module_exit(gpio_driver_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Operativos");
-MODULE_DESCRIPTION("A simple GPIO driver example");;
-MODULE_VERSION("1.0");;
+MODULE_DESCRIPTION("A simple GPIO driver example");
+MODULE_VERSION("1.0");
 
