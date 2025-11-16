@@ -38,9 +38,8 @@ static void gpio_pin_off(unsigned int pin)
 
 ssize_t proc_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
-    copy_to_user(buf, "Hello\n", 7);
-    printk("Wrote 7 bytes to /proc/gpio_driver\n");
-    return 7;    
+    return copy_to_user(buf, "Hello\n", 7) ? 0 : 7;
+        
 }
 
 ssize_t proc_write(struct file *file, const char __user *buf, size_t size, loff_t *offset)
@@ -74,7 +73,6 @@ ssize_t proc_write(struct file *file, const char __user *buf, size_t size, loff_
         printk("Invalid value. Use 0 for LOW and 1 for HIGH.\n");
         return size;
     }
-    printk("You wrote: pin=%u value=%u\n", pin, value);
 
     if (value == 1)
     {

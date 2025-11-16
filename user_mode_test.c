@@ -6,13 +6,13 @@
 
 int main()
 {
-    int f = open("/proc/gpio_driver", O_RDWR);
+    int f = open("/proc/my_gpio_driver", O_RDWR);
 
     while (1)
     {
-        write(f, "17 1", 4);
-        sleep(5);
-        write(f, "17 0", 4);
-        sleep(5);
+        write(f, "21 1", 4);
+        sleep(1);
+        write(f, "21 0", 4);
+        sleep(1);
     }
 }
