@@ -49,6 +49,7 @@ int histogram_get_hw_config(histogram_hw_config_t *config)
 {
     char buffer[256];
     ssize_t bytes_read;
+    off_t offset;
     
     if (driver_fd < 0) {
         fprintf(stderr, "Driver not initialized\n");
@@ -60,20 +61,35 @@ int histogram_get_hw_config(histogram_hw_config_t *config)
         return -1;
     }
     
+    // Reset offset
+    offset = lseek(driver_fd, 0, SEEK_SET);
+    if (offset == (off_t)-1) {
+        perror("Failed to seek to beginning");
+        return -1;
+    }
+    
     // Read from driver
-    lseek(driver_fd, 0, SEEK_SET);
+    memset(buffer, 0, sizeof(buffer));
     bytes_read = read(driver_fd, buffer, sizeof(buffer) - 1);
     if (bytes_read < 0) {
         perror("Failed to read hardware config");
         return -1;
     }
     
+    //parse
+    if (bytes_read == 0) {
+        fprintf(stderr, "No data read from driver\n");
+        return -1;
+    }
+    
     buffer[bytes_read] = '\0';
     
-    // Parse configuration: "matrices=4\nwidth=32\nheight=8\n"
+    printf("Read from driver (%zd bytes): %s", bytes_read, buffer);
+    
     if (sscanf(buffer, "matrices=%d\nwidth=%d\nheight=%d",
                &config->matrices, &config->width, &config->height) != 3) {
         fprintf(stderr, "Failed to parse hardware configuration\n");
+        fprintf(stderr, "Buffer content: '%s'\n", buffer);
         return -1;
     }
     
