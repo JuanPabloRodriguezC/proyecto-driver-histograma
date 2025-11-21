@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <time.h>
 #include "histogram_lib.h"
-
+#include <math.h>
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 // Function to generate a sample histogram
