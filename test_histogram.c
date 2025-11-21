@@ -1,240 +1,193 @@
+#include "histogram_lib.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
 #include <unistd.h>
-#include <time.h>
-#include "histogram_lib.h"
+#include <math.h>
 
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+void print_histogram_info(histogram_hw_config_t *config)
+{
+    printf("\n=== Hardware Configuration ===\n");
+    printf("Matrices: %d\n", config->matrices);
+    printf("Display size: %d x %d pixels\n", config->width, config->height);
+    printf("Total pixels: %d\n", config->width * config->height);
+    printf("=============================\n\n");
+}
 
-// Function to generate a sample histogram
-void generate_sample_histogram(uint32_t histogram[256], const char *type)
+void create_sample_histogram(uint32_t histogram[256])
 {
     int i;
-    srand(time(NULL));
     
-    memset(histogram, 0, 256 * sizeof(uint32_t));
-    
-    if (strcmp(type, "uniform") == 0) {
-        // Uniform distribution
-        for (i = 0; i < 256; i++) {
-            histogram[i] = 100 + (rand() % 50);
-        }
-    }
-    else if (strcmp(type, "gaussian") == 0) {
-        // Gaussian-like distribution centered at 128
-        for (i = 0; i < 256; i++) {
-            int diff = i - 128;
-            histogram[i] = 1000 * exp(-(diff * diff) / 2048.0);
-        }
-    }
-    else if (strcmp(type, "bimodal") == 0) {
-        // Bimodal distribution (peaks at 64 and 192)
-        for (i = 0; i < 256; i++) {
-            int diff1 = i - 64;
-            int diff2 = i - 192;
-            histogram[i] = 500 * exp(-(diff1 * diff1) / 1024.0) +
-                          500 * exp(-(diff2 * diff2) / 1024.0);
-        }
-    }
-    else if (strcmp(type, "increasing") == 0) {
-        // Linearly increasing
-        for (i = 0; i < 256; i++) {
-            histogram[i] = i * 4;
-        }
-    }
-    else if (strcmp(type, "decreasing") == 0) {
-        // Linearly decreasing
-        for (i = 0; i < 256; i++) {
-            histogram[i] = (255 - i) * 4;
-        }
-    }
-    else {
-        // Random
-        for (i = 0; i < 256; i++) {
-            histogram[i] = rand() % 1000;
-        }
+    // Create a sample histogram with Gaussian-like distribution
+    for (i = 0; i < 256; i++) {
+        double x = (i - 128.0) / 64.0;
+        histogram[i] = (uint32_t)(1000.0 * exp(-x * x));
     }
 }
 
-void print_menu(void)
+void create_bimodal_histogram(uint32_t histogram[256])
 {
-    printf("\n=== MAX7219 Histogram Display Test ===\n");
-    printf("1. Display uniform histogram\n");
-    printf("2. Display gaussian histogram\n");
-    printf("3. Display bimodal histogram\n");
-    printf("4. Display increasing histogram\n");
-    printf("5. Display decreasing histogram\n");
-    printf("6. Display random histogram\n");
-    printf("7. Display windowed view (scroll)\n");
-    printf("8. Test pattern\n");
-    printf("9. Clear display\n");
-    printf("10. Set brightness\n");
-    printf("11. Draw custom pattern\n");
-    printf("0. Exit\n");
-    printf("Choice: ");
+    int i;
+    
+    // Create a bimodal distribution
+    for (i = 0; i < 256; i++) {
+        double x1 = (i - 80.0) / 40.0;
+        double x2 = (i - 180.0) / 40.0;
+        histogram[i] = (uint32_t)(500.0 * (exp(-x1 * x1) + exp(-x2 * x2)));
+    }
 }
 
-void test_windowed_display(void)
+void create_uniform_histogram(uint32_t histogram[256])
 {
-    uint32_t histogram[256];
-    int start;
+    int i;
     
-    printf("Generating sample data...\n");
-    generate_sample_histogram(histogram, "gaussian");
+    // Create uniform distribution
+    for (i = 0; i < 256; i++) {
+        histogram[i] = 500 + (rand() % 200);
+    }
+}
+
+void print_dimensioned_histogram(uint8_t *hist, int width)
+{
+    int i, j;
     
-    printf("Scrolling through histogram windows...\n");
-    for (start = 0; start <= 224; start += 32) {
-        printf("Window starting at intensity %d\n", start);
-        if (histogram_display_window(histogram, start) < 0) {
-            fprintf(stderr, "Failed to display window\n");
-            return;
+    printf("\nDimensioned histogram values:\n");
+    for (i = 0; i < width; i++) {
+        printf("[%2d]: %d ", i, hist[i]);
+        for (j = 0; j < hist[i]; j++) {
+            printf("█");
         }
-        sleep(2);
+        printf("\n");
     }
-}
-
-void test_brightness(void)
-{
-    int level;
-    
-    printf("Enter brightness level (0-15): ");
-    if (scanf("%d", &level) != 1) {
-        fprintf(stderr, "Invalid input\n");
-        return;
-    }
-    
-    if (histogram_set_brightness(level) < 0) {
-        fprintf(stderr, "Failed to set brightness\n");
-    } else {
-        printf("Brightness set to %d\n", level);
-    }
-}
-
-void test_custom_pattern(void)
-{
-    int x, y;
-    
-    printf("Drawing smiley face...\n");
-    histogram_clear();
-    
-    // Eyes
-    matrix_set_pixel(8, 2, true);
-    matrix_set_pixel(9, 2, true);
-    matrix_set_pixel(22, 2, true);
-    matrix_set_pixel(23, 2, true);
-    
-    // Mouth
-    for (x = 10; x <= 21; x++) {
-        if (x >= 10 && x <= 12) y = 5;
-        else if (x >= 13 && x <= 18) y = 6;
-        else y = 5;
-        matrix_set_pixel(x, y, true);
-    }
-    
-    matrix_update();
-    printf("Custom pattern displayed!\n");
+    printf("\n");
 }
 
 int main(void)
 {
+    histogram_hw_config_t config;
     uint32_t histogram[256];
-    int choice;
-    int running = 1;
+    uint8_t *dimensioned;
+    int result;
     
-    printf("Initializing MAX7219 Histogram Display...\n");
+    printf("=== MAX7219 Histogram Library Test ===\n\n");
     
-    if (histogram_init() < 0) {
+    // Initialize library
+    printf("Initializing histogram display...\n");
+    result = histogram_init();
+    if (result < 0) {
         fprintf(stderr, "Failed to initialize histogram display\n");
-        fprintf(stderr, "Make sure the driver is loaded: sudo insmod max7219_driver.ko\n");
+        return 1;
+    }
+    printf("✓ Initialization successful\n");
+    
+    // Get hardware configuration
+    result = histogram_get_hw_config(&config);
+    if (result < 0) {
+        fprintf(stderr, "Failed to get hardware configuration\n");
+        histogram_cleanup();
+        return 1;
+    }
+    print_histogram_info(&config);
+    
+    // Allocate dimensioned histogram
+    dimensioned = malloc(config.width * sizeof(uint8_t));
+    if (dimensioned == NULL) {
+        fprintf(stderr, "Failed to allocate memory\n");
+        histogram_cleanup();
         return 1;
     }
     
-    printf("Display initialized successfully!\n");
-    printf("Hardware: 4x MAX7219 8x8 LED Matrices (32x8 resolution)\n");
+    // Test 1: Clear display
+    printf("Test 1: Clearing display...\n");
+    histogram_clear();
+    sleep(2);
+    printf("✓ Display cleared\n\n");
     
-    while (running) {
-        print_menu();
-        
-        if (scanf("%d", &choice) != 1) {
-            fprintf(stderr, "Invalid input\n");
-            while (getchar() != '\n');
-            continue;
-        }
-        
-        switch (choice) {
-            case 1:
-                printf("Displaying uniform histogram...\n");
-                generate_sample_histogram(histogram, "uniform");
-                histogram_display_grouped(histogram);
-                break;
-                
-            case 2:
-                printf("Displaying gaussian histogram...\n");
-                generate_sample_histogram(histogram, "gaussian");
-                histogram_display_grouped(histogram);
-                break;
-                
-            case 3:
-                printf("Displaying bimodal histogram...\n");
-                generate_sample_histogram(histogram, "bimodal");
-                histogram_display_grouped(histogram);
-                break;
-                
-            case 4:
-                printf("Displaying increasing histogram...\n");
-                generate_sample_histogram(histogram, "increasing");
-                histogram_display_grouped(histogram);
-                break;
-                
-            case 5:
-                printf("Displaying decreasing histogram...\n");
-                generate_sample_histogram(histogram, "decreasing");
-                histogram_display_grouped(histogram);
-                break;
-                
-            case 6:
-                printf("Displaying random histogram...\n");
-                generate_sample_histogram(histogram, "random");
-                histogram_display_grouped(histogram);
-                break;
-                
-            case 7:
-                test_windowed_display();
-                break;
-                
-            case 8:
-                printf("Displaying test pattern...\n");
-                histogram_test_pattern();
-                break;
-                
-            case 9:
-                printf("Clearing display...\n");
-                histogram_clear();
-                break;
-                
-            case 10:
-                test_brightness();
-                break;
-                
-            case 11:
-                test_custom_pattern();
-                break;
-                
-            case 0:
-                printf("Exiting...\n");
-                running = 0;
-                break;
-                
-            default:
-                printf("Invalid choice\n");
-                break;
+    // Test 2: Test pattern
+    printf("Test 2: Displaying test pattern...\n");
+    histogram_test_pattern();
+    sleep(3);
+    printf("✓ Test pattern displayed\n\n");
+    
+    histogram_clear();
+    sleep(1);
+    
+    // Test 3: Gaussian histogram
+    printf("Test 3: Displaying Gaussian distribution...\n");
+    create_sample_histogram(histogram);
+    
+    result = histogram_dimension(histogram, dimensioned, config.width, config.height);
+    if (result < 0) {
+        fprintf(stderr, "Failed to dimension histogram\n");
+    } else {
+        print_dimensioned_histogram(dimensioned, config.width);
+        result = histogram_display(dimensioned, config.width);
+        if (result < 0) {
+            fprintf(stderr, "Failed to display histogram\n");
+        } else {
+            printf("✓ Gaussian histogram displayed\n");
         }
     }
+    sleep(4);
     
+    // Test 4: Bimodal histogram using auto function
+    printf("\nTest 4: Displaying bimodal distribution (auto)...\n");
+    create_bimodal_histogram(histogram);
+    
+    result = histogram_display_auto(histogram);
+    if (result < 0) {
+        fprintf(stderr, "Failed to auto-display histogram\n");
+    } else {
+        printf("✓ Bimodal histogram displayed\n");
+    }
+    sleep(4);
+    
+    // Test 5: Uniform histogram
+    printf("\nTest 5: Displaying uniform distribution...\n");
+    create_uniform_histogram(histogram);
+    
+    result = histogram_dimension(histogram, dimensioned, config.width, config.height);
+    if (result == 0) {
+        print_dimensioned_histogram(dimensioned, config.width);
+        result = histogram_display(dimensioned, config.width);
+        if (result == 0) {
+            printf("✓ Uniform histogram displayed\n");
+        }
+    }
+    sleep(4);
+    
+    // Test 6: Brightness control
+    printf("\nTest 6: Testing brightness levels...\n");
+    for (int brightness = 0; brightness <= 15; brightness += 5) {
+        printf("  Setting brightness to %d/15...\n", brightness);
+        histogram_set_brightness(brightness);
+        sleep(1);
+    }
+    histogram_set_brightness(8);  // Return to medium
+    printf("✓ Brightness test complete\n");
+    sleep(2);
+    
+    // Test 7: Manual pixel control
+    printf("\nTest 7: Manual pixel drawing...\n");
+    histogram_clear();
+    sleep(1);
+    
+    // Draw a pattern
+    for (int x = 0; x < config.width; x++) {
+        int y = (int)(config.height / 2 + (config.height / 3) * sin(x * 0.5));
+        if (y >= 0 && y < config.height) {
+            matrix_set_pixel(x, y, true);
+        }
+    }
+    printf("✓ Sine wave pattern drawn\n");
+    sleep(4);
+    
+    // Clean up
+    printf("\nCleaning up...\n");
+    histogram_clear();
+    free(dimensioned);
     histogram_cleanup();
-    printf("Cleanup complete. Goodbye!\n");
+    
+    printf("\n=== All tests completed successfully ===\n");
     
     return 0;
 }

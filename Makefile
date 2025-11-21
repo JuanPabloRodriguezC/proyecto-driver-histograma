@@ -43,7 +43,7 @@ $(LIB_NAME): $(LIB_OBJ)
 test: $(TEST_PROG)
 
 $(TEST_PROG): $(TEST_SRC) $(LIB_NAME) $(LIB_HEADER)
-	$(CC) $(CFLAGS) $(TEST_SRC) -o $(TEST_PROG) -L. -lhistogram
+	$(CC) $(CFLAGS) $(TEST_SRC) -o $(TEST_PROG) -L. -lhistogram -lm
 
 # Install driver module
 install: driver
