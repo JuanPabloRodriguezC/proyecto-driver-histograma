@@ -10,10 +10,10 @@
 #define MAX_USER_SIZE 4096
 #define BCM2837_GPIO_ADDRESS 0x3F200000
 
-// SPI Pins for MAX7219
-#define SPI_MOSI  10  // GPIO 10 - Data
-#define SPI_CLK   11  // GPIO 11 - Clock
-#define SPI_CS    8   // GPIO 8  - Chip Select / Load
+// SPI Pins
+#define SPI_MOSI  10
+#define SPI_CLK   11
+#define SPI_CS    8
 
 // MAX7219 Registers
 #define MAX7219_REG_NOOP        0x00
@@ -40,7 +40,6 @@ static unsigned int *gpio_registers = NULL;
 // Framebuffer for 4 matrices (32x8)
 static uint8_t framebuffer[NUM_MATRICES][8];
 
-// GPIO Helper Functions
 static inline void gpio_set_output(unsigned int pin)
 {
     unsigned int reg = pin / 10;
@@ -63,7 +62,7 @@ static inline void gpio_set_low(unsigned int pin)
     *clr_reg = (1 << pin);
 }
 
-// SPI Bit-Banging Functions
+
 static void spi_init(void)
 {
     gpio_set_output(SPI_MOSI);
@@ -72,7 +71,7 @@ static void spi_init(void)
     
     gpio_set_low(SPI_MOSI);
     gpio_set_low(SPI_CLK);
-    gpio_set_high(SPI_CS);  // CS is active low
+    gpio_set_high(SPI_CS);
 }
 
 static void spi_transfer_byte(uint8_t data)
@@ -86,20 +85,19 @@ static void spi_transfer_byte(uint8_t data)
         else
             gpio_set_low(SPI_MOSI);
         
-        udelay(1);  // Small delay for stable clock
+        udelay(5);  // Increased delay for stability
         gpio_set_high(SPI_CLK);
-        udelay(1);
+        udelay(5);  // Increased delay for stability
     }
     gpio_set_low(SPI_CLK);
 }
 
-// MAX7219 Functions
 static void max7219_send(uint8_t reg, uint8_t data, int matrix_index)
 {
     int i;
     
     gpio_set_low(SPI_CS);
-    udelay(1);
+    udelay(5);  // Increased CS setup time
     
     // Send to all matrices in cascade
     for (i = NUM_MATRICES - 1; i >= 0; i--) {
@@ -113,8 +111,9 @@ static void max7219_send(uint8_t reg, uint8_t data, int matrix_index)
         }
     }
     
+    udelay(5);  // Increased CS hold time
     gpio_set_high(SPI_CS);
-    udelay(1);
+    udelay(5);  // Time for latch
 }
 
 static void max7219_broadcast(uint8_t reg, uint8_t data)
@@ -122,7 +121,7 @@ static void max7219_broadcast(uint8_t reg, uint8_t data)
     int i;
     
     gpio_set_low(SPI_CS);
-    udelay(1);
+    udelay(5);
     
     // Send same command to all matrices
     for (i = 0; i < NUM_MATRICES; i++) {
@@ -130,8 +129,9 @@ static void max7219_broadcast(uint8_t reg, uint8_t data)
         spi_transfer_byte(data);
     }
     
+    udelay(5);
     gpio_set_high(SPI_CS);
-    udelay(1);
+    udelay(5);
 }
 
 static void max7219_init(void)
@@ -284,13 +284,18 @@ static ssize_t proc_write(struct file *file, const char __user *buf, size_t size
     else if (strcmp(cmd, "histogram") == 0) {
         // Expect histogram data after command
         char *data_ptr = data_buffer + strlen(cmd) + 1;
+        size_t expected_size = strlen(cmd) + 1 + sizeof(histogram);
         
-        if (size > strlen(cmd) + 1 + sizeof(histogram)) {
+        printk(KERN_DEBUG "MAX7219: Received %zu bytes, expected %zu bytes\n", 
+               size, expected_size);
+        
+        if (size >= expected_size) {
             memcpy(histogram, data_ptr, sizeof(histogram));
             display_histogram_grouped(histogram);
             printk(KERN_INFO "MAX7219: Histogram displayed\n");
         } else {
-            printk(KERN_WARNING "MAX7219: Invalid histogram data size\n");
+            printk(KERN_WARNING "MAX7219: Invalid histogram data size (got %zu, need %zu)\n",
+                   size, expected_size);
         }
     }
     else if (strcmp(cmd, "pixel") == 0) {
@@ -321,6 +326,7 @@ static const struct proc_ops fops = {
 
 static int __init max7219_driver_init(void)
 {
+    // Map GPIO memory
     gpio_registers = (unsigned int*)ioremap(BCM2837_GPIO_ADDRESS, PAGE_SIZE);
     
     if (gpio_registers == NULL) {
@@ -328,12 +334,17 @@ static int __init max7219_driver_init(void)
         return -ENOMEM;
     }
     
+    printk(KERN_INFO "MAX7219: Successfully mapped in GPIO memory\n");
+    
+    // Initialize hardware
     max7219_init();
     
+    // Create proc entry
     proc_entry = proc_create("max7219", 0666, NULL, &fops);
     if (proc_entry == NULL) {
-        iounmap(gpio_registers);
         printk(KERN_ALERT "MAX7219: Failed to create /proc/max7219\n");
+        iounmap(gpio_registers);
+        gpio_registers = NULL;
         return -ENOMEM;
     }
     
@@ -346,13 +357,22 @@ static int __init max7219_driver_init(void)
 
 static void __exit max7219_driver_exit(void)
 {
-    max7219_clear();
-    max7219_broadcast(MAX7219_REG_SHUTDOWN, 0x00);  // Shutdown
+    if (gpio_registers != NULL) {
+        max7219_clear();
+        max7219_broadcast(MAX7219_REG_SHUTDOWN, 0x00);
+    }
     
-    proc_remove(proc_entry);
-    iounmap(gpio_registers);
+    if (proc_entry != NULL) {
+        proc_remove(proc_entry);
+        proc_entry = NULL;
+    }
     
-    printk(KERN_INFO "MAX7219: Driver unloaded\n");
+    if (gpio_registers != NULL) {
+        iounmap(gpio_registers);
+        gpio_registers = NULL;
+    }
+    
+    printk(KERN_INFO "MAX7219: Driver unloaded successfully\n");
 }
 
 module_init(max7219_driver_init);
