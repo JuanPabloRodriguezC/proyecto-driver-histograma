@@ -161,6 +161,8 @@ int histogram_display(const uint8_t *histogram, int width)
     char buffer[BUFFER_SIZE];
     ssize_t written;
     size_t total_size;
+    uint8_t *rotated;
+    int i;
     
     if (driver_fd < 0) {
         fprintf(stderr, "Driver not initialized\n");
@@ -179,13 +181,41 @@ int histogram_display(const uint8_t *histogram, int width)
         return -1;
     }
     
+    // Allocate buffer for rotated histogram
+    // After 90° CW rotation, the display shows the histogram rotated
+    // Width becomes height, so we need width entries still
+    rotated = malloc(width * sizeof(uint8_t));
+    if (rotated == NULL) {
+        perror("Failed to allocate memory for rotation");
+        return -1;
+    }
+    
+    // Rotate 90 degrees clockwise
+    // Original histogram: histogram[0..31] with heights 0..8
+    // Displayed as vertical bars from bottom to top
+    //
+    // After 90° CW rotation:
+    // - What was column 0 (leftmost) becomes row 0 (bottom)
+    // - What was column 31 (rightmost) becomes row 31 (top)
+    // - Vertical bars become horizontal bars extending right
+    //
+    // So: rotated[i] = histogram[width - 1 - i]
+    // This reverses the order (rightmost becomes bottom)
+    
+    for (i = 0; i < width; i++) {
+        rotated[i] = histogram[width - 1 - i];
+    }
+    
     // Prepare command: "histogram " followed by width bytes
     strcpy(buffer, "histogram ");
-    memcpy(buffer + strlen(buffer), histogram, width);
+    memcpy(buffer + strlen(buffer), rotated, width);
     
     total_size = strlen("histogram ") + width;
     
     written = write(driver_fd, buffer, total_size);
+    
+    free(rotated);
+    
     if (written < 0) {
         perror("Failed to write histogram data");
         return -1;
@@ -240,6 +270,7 @@ int matrix_set_pixel(int x, int y, bool on)
 {
     char buffer[64];
     ssize_t written;
+    int rotated_x, rotated_y;
     
     if (driver_fd < 0) {
         fprintf(stderr, "Driver not initialized\n");
@@ -251,7 +282,14 @@ int matrix_set_pixel(int x, int y, bool on)
         return -1;
     }
     
-    snprintf(buffer, sizeof(buffer), "pixel %d %d %d", x, y, on ? 1 : 0);
+    // Rotate 90 degrees clockwise
+    // Formula for 90° CW rotation:
+    // new_x = old_y
+    // new_y = (width - 1) - old_x
+    rotated_x = y;
+    rotated_y = (hw_config.width - 1) - x;
+    
+    snprintf(buffer, sizeof(buffer), "pixel %d %d %d", rotated_x, rotated_y, on ? 1 : 0);
     
     written = write(driver_fd, buffer, strlen(buffer));
     if (written < 0) {

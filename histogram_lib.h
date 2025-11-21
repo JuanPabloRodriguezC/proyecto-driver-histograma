@@ -51,6 +51,11 @@ int histogram_dimension(const uint32_t input_histogram[256],
  * hardware specifications. The histogram should contain height values
  * (0 to hw_height) for each column.
  * 
+ * NOTE: This function automatically applies a 90° clockwise rotation
+ * to accommodate the physical orientation of the display hardware.
+ * Users provide data in logical orientation, and the library handles
+ * the transformation transparently.
+ * 
  * @param histogram Dimensioned histogram array (size = hw_width)
  * @param width Width of the histogram (must match hardware width)
  * @return 0 on success, -1 on failure
@@ -71,8 +76,14 @@ int histogram_display_auto(const uint32_t histogram[256]);
 
 /**
  * @brief Set a specific pixel on the display
- * @param x X coordinate (0 to width-1)
- * @param y Y coordinate (0 to height-1)
+ * 
+ * NOTE: Coordinates are in logical orientation. This function automatically
+ * applies a 90° clockwise rotation to match the physical display orientation.
+ * Users work with logical coordinates (x=0 is left, y=0 is top), and the
+ * library handles the physical transformation.
+ * 
+ * @param x X coordinate (0 to width-1) in logical orientation
+ * @param y Y coordinate (0 to height-1) in logical orientation
  * @param on true to turn on, false to turn off
  * @return 0 on success, -1 on failure
  */
