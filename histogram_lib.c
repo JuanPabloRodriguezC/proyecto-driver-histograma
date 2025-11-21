@@ -49,34 +49,33 @@ int histogram_get_hw_config(histogram_hw_config_t *config)
 {
     char buffer[256];
     ssize_t bytes_read;
-    off_t offset;
-    
-    if (driver_fd < 0) {
-        fprintf(stderr, "Driver not initialized\n");
-        return -1;
-    }
+    int fd;
     
     if (config == NULL) {
         fprintf(stderr, "Invalid config pointer\n");
         return -1;
     }
     
-    // Reset offset
-    offset = lseek(driver_fd, 0, SEEK_SET);
-    if (offset == (off_t)-1) {
-        perror("Failed to seek to beginning");
+    // Open driver for reading configuration
+    // Note: we open a new fd here because /proc files don't support lseek
+    fd = open(DRIVER_PATH, O_RDONLY);
+    if (fd < 0) {
+        perror("Failed to open driver for reading config");
         return -1;
     }
     
     // Read from driver
     memset(buffer, 0, sizeof(buffer));
-    bytes_read = read(driver_fd, buffer, sizeof(buffer) - 1);
+    bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+    
+    // Close this temporary fd
+    close(fd);
+    
     if (bytes_read < 0) {
         perror("Failed to read hardware config");
         return -1;
     }
     
-    //parse
     if (bytes_read == 0) {
         fprintf(stderr, "No data read from driver\n");
         return -1;
@@ -84,8 +83,10 @@ int histogram_get_hw_config(histogram_hw_config_t *config)
     
     buffer[bytes_read] = '\0';
     
+    // Debug: print what we read
     printf("Read from driver (%zd bytes): %s", bytes_read, buffer);
     
+    // Parse configuration: "matrices=4\nwidth=32\nheight=8\n"
     if (sscanf(buffer, "matrices=%d\nwidth=%d\nheight=%d",
                &config->matrices, &config->width, &config->height) != 3) {
         fprintf(stderr, "Failed to parse hardware configuration\n");
@@ -145,8 +146,8 @@ int histogram_dimension(const uint32_t input_histogram[256],
         if (max_value == 0) {
             output_histogram[col] = 0;
         } else {
-            uint32_t scaled = (grouped[col] * hw_height) / max_value;
-            if (scaled > hw_height) scaled = hw_height;
+            uint32_t scaled = (grouped[col] * (uint32_t)hw_height) / max_value;
+            if (scaled > (uint32_t)hw_height) scaled = (uint32_t)hw_height;
             output_histogram[col] = (uint8_t)scaled;
         }
     }
