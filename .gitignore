@@ -1,3 +1,5 @@
 *.o
 libhisto/demo
 *.a
+
+.DS_Store

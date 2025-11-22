@@ -5,30 +5,85 @@
 #include <stdbool.h>
 
 /**
+ * @brief Hardware configuration structure
+ */
+typedef struct {
+    int matrices;
+    int width;
+    int height;
+} histogram_hw_config_t;
+
+/**
  * @brief Initialize the histogram display system
  * @return 0 on success, -1 on failure
  */
 int histogram_init(void);
 
 /**
- * @brief Display a histogram with 256 intensity values grouped into 32 columns
- * @param histogram Array of 256 intensity counts
+ * @brief Get hardware configuration from driver
+ * @param config Pointer to store hardware configuration
  * @return 0 on success, -1 on failure
  */
-int histogram_display_grouped(const uint32_t histogram[256]);
+int histogram_get_hw_config(histogram_hw_config_t *config);
 
 /**
- * @brief Display a sliding window of the histogram (32 consecutive intensities)
- * @param histogram Array of 256 intensity counts
- * @param start_intensity Starting intensity (0-224, must be multiple of 8)
+ * @brief Create dimensioned histogram from 256-value histogram
+ * 
+ * Takes a full 256-value histogram and creates a dimensioned version
+ * that fits the hardware display dimensions. Groups intensities into
+ * buckets matching the display width and scales heights to fit display height.
+ * 
+ * @param input_histogram Input histogram with 256 intensity values
+ * @param output_histogram Output array (must be allocated with size = hw_width)
+ * @param hw_width Hardware display width (number of columns)
+ * @param hw_height Hardware display height (maximum bar height)
  * @return 0 on success, -1 on failure
  */
-int histogram_display_window(const uint32_t histogram[256], int start_intensity);
+int histogram_dimension(const uint32_t input_histogram[256], 
+                       uint8_t *output_histogram,
+                       int hw_width,
+                       int hw_height);
+
+/**
+ * @brief Display a pre-dimensioned histogram on hardware
+ * 
+ * Sends a histogram that has already been dimensioned to match the
+ * hardware specifications. The histogram should contain height values
+ * (0 to hw_height) for each column.
+ * 
+ * NOTE: This function automatically applies a 90° clockwise rotation
+ * to accommodate the physical orientation of the display hardware.
+ * Users provide data in logical orientation, and the library handles
+ * the transformation transparently.
+ * 
+ * @param histogram Dimensioned histogram array (size = hw_width)
+ * @param width Width of the histogram (must match hardware width)
+ * @return 0 on success, -1 on failure
+ */
+int histogram_display(const uint8_t *histogram, int width);
+
+/**
+ * @brief Display a 256-value histogram (convenience function)
+ * 
+ * Automatically dimensions and displays a full 256-value histogram.
+ * This is a convenience function that combines histogram_dimension()
+ * and histogram_display().
+ * 
+ * @param histogram Full 256-value histogram
+ * @return 0 on success, -1 on failure
+ */
+int histogram_display_auto(const uint32_t histogram[256]);
 
 /**
  * @brief Set a specific pixel on the display
- * @param x X coordinate (0-31)
- * @param y Y coordinate (0-7)
+ * 
+ * NOTE: Coordinates are in logical orientation. This function automatically
+ * applies a 90° clockwise rotation to match the physical display orientation.
+ * Users work with logical coordinates (x=0 is left, y=0 is top), and the
+ * library handles the physical transformation.
+ * 
+ * @param x X coordinate (0 to width-1) in logical orientation
+ * @param y Y coordinate (0 to height-1) in logical orientation
  * @param on true to turn on, false to turn off
  * @return 0 on success, -1 on failure
  */

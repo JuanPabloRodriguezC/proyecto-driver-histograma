@@ -32,13 +32,13 @@
 #define MAX7219_REG_DISPLAYTEST 0x0F
 
 #define NUM_MATRICES 4
+#define MATRIX_HEIGHT 8
 
 static struct proc_dir_entry *proc_entry = NULL;
 static char data_buffer[MAX_USER_SIZE];
 static unsigned int *gpio_registers = NULL;
 
-// Framebuffer for 4 matrices (32x8)
-static uint8_t framebuffer[NUM_MATRICES][8];
+static uint8_t framebuffer[NUM_MATRICES][MATRIX_HEIGHT];
 
 static inline void gpio_set_output(unsigned int pin)
 {
@@ -62,7 +62,6 @@ static inline void gpio_set_low(unsigned int pin)
     *clr_reg = (1 << pin);
 }
 
-
 static void spi_init(void)
 {
     gpio_set_output(SPI_MOSI);
@@ -85,9 +84,9 @@ static void spi_transfer_byte(uint8_t data)
         else
             gpio_set_low(SPI_MOSI);
         
-        udelay(5);  // Increased delay for stability
+        udelay(5);
         gpio_set_high(SPI_CLK);
-        udelay(5);  // Increased delay for stability
+        udelay(5);
     }
     gpio_set_low(SPI_CLK);
 }
@@ -97,9 +96,8 @@ static void max7219_send(uint8_t reg, uint8_t data, int matrix_index)
     int i;
     
     gpio_set_low(SPI_CS);
-    udelay(5);  // Increased CS setup time
+    udelay(5);
     
-    // Send to all matrices in cascade
     for (i = NUM_MATRICES - 1; i >= 0; i--) {
         if (i == matrix_index) {
             spi_transfer_byte(reg);
@@ -111,9 +109,9 @@ static void max7219_send(uint8_t reg, uint8_t data, int matrix_index)
         }
     }
     
-    udelay(5);  // Increased CS hold time
+    udelay(5);
     gpio_set_high(SPI_CS);
-    udelay(5);  // Time for latch
+    udelay(5);
 }
 
 static void max7219_broadcast(uint8_t reg, uint8_t data)
@@ -123,7 +121,7 @@ static void max7219_broadcast(uint8_t reg, uint8_t data)
     gpio_set_low(SPI_CS);
     udelay(5);
     
-    // Send same command to all matrices
+    // Mismo comando a todas las matrices
     for (i = 0; i < NUM_MATRICES; i++) {
         spi_transfer_byte(reg);
         spi_transfer_byte(data);
@@ -156,7 +154,7 @@ static void max7219_clear(void)
     
     memset(framebuffer, 0, sizeof(framebuffer));
     
-    for (row = 0; row < 8; row++) {
+    for (row = 0; row < MATRIX_HEIGHT; row++) {
         max7219_broadcast(MAX7219_REG_DIGIT0 + row, 0x00);
     }
 }
@@ -165,7 +163,7 @@ static void max7219_update(void)
 {
     int matrix, row;
     
-    for (row = 0; row < 8; row++) {
+    for (row = 0; row < MATRIX_HEIGHT; row++) {
         for (matrix = 0; matrix < NUM_MATRICES; matrix++) {
             max7219_send(MAX7219_REG_DIGIT0 + row, 
                         framebuffer[matrix][row], 
@@ -178,58 +176,18 @@ static void max7219_set_pixel(int x, int y, bool on)
 {
     int matrix, local_x, byte_index, bit_index;
     
-    if (x < 0 || x >= 32 || y < 0 || y >= 8)
+    if (x < 0 || x >= (NUM_MATRICES * 8) || y < 0 || y >= MATRIX_HEIGHT)
         return;
     
-    // Determine which matrix (0-3) and local position
     matrix = x / 8;
     local_x = x % 8;
     
-    byte_index = y;
     bit_index = 7 - local_x;  // MSB is leftmost pixel
     
     if (on)
-        framebuffer[matrix][byte_index] |= (1 << bit_index);
+        framebuffer[matrix][y] |= (1 << bit_index);
     else
-        framebuffer[matrix][byte_index] &= ~(1 << bit_index);
-}
-
-// Histogram display function
-static void display_histogram_grouped(uint32_t *histogram)
-{
-    int i, col, height;
-    uint32_t max_value = 0;
-    uint32_t grouped[32];
-    
-    // Group 256 intensities into 32 columns
-    memset(grouped, 0, sizeof(grouped));
-    for (i = 0; i < 256; i++) {
-        grouped[i / 8] += histogram[i];
-    }
-    
-    // Find maximum for scaling
-    for (i = 0; i < 32; i++) {
-        if (grouped[i] > max_value)
-            max_value = grouped[i];
-    }
-    
-    // Clear display
-    max7219_clear();
-    
-    if (max_value == 0)
-        return;
-    
-    // Draw histogram
-    for (col = 0; col < 32; col++) {
-        height = (grouped[col] * 8) / max_value;
-        if (height > 8) height = 8;
-        
-        for (i = 0; i < height; i++) {
-            max7219_set_pixel(col, 7 - i, true);
-        }
-    }
-    
-    max7219_update();
+        framebuffer[matrix][y] &= ~(1 << bit_index);
 }
 
 // Proc file operations
@@ -237,13 +195,15 @@ static ssize_t proc_read(struct file *file, char __user *buf, size_t count, loff
 {
     char msg[128];
     int len;
+    int width = NUM_MATRICES * 8;
+    int height = MATRIX_HEIGHT;
     
     if (*offset > 0)
         return 0;
     
     len = snprintf(msg, sizeof(msg), 
-                   "MAX7219 Driver Ready\nMatrices: %d\nResolution: 32x8\n",
-                   NUM_MATRICES);
+                   "matrices=%d\nwidth=%d\nheight=%d\n",
+                   NUM_MATRICES, width, height);
     
     if (copy_to_user(buf, msg, len))
         return -EFAULT;
@@ -255,7 +215,6 @@ static ssize_t proc_read(struct file *file, char __user *buf, size_t count, loff
 static ssize_t proc_write(struct file *file, const char __user *buf, size_t size, loff_t *offset)
 {
     char cmd[32];
-    uint32_t histogram[256];
     int i;
     
     memset(data_buffer, 0, sizeof(data_buffer));
@@ -275,35 +234,52 @@ static ssize_t proc_write(struct file *file, const char __user *buf, size_t size
     }
     else if (strcmp(cmd, "test") == 0) {
         // Test pattern
-        for (i = 0; i < 32; i++) {
-            max7219_set_pixel(i, i % 8, true);
+        for (i = 0; i < NUM_MATRICES * 8; i++) {
+            max7219_set_pixel(i, i % MATRIX_HEIGHT, true);
         }
         max7219_update();
         printk(KERN_INFO "MAX7219: Test pattern displayed\n");
     }
     else if (strcmp(cmd, "histogram") == 0) {
-        // Expect histogram data after command
+        // Format: "histogram " followed by width * height bytes
         char *data_ptr = data_buffer + strlen(cmd) + 1;
-        size_t expected_size = strlen(cmd) + 1 + sizeof(histogram);
+        size_t expected_width = NUM_MATRICES * 8;
+        size_t expected_size = strlen(cmd) + 1 + expected_width;
         
-        printk(KERN_DEBUG "MAX7219: Received %zu bytes, expected %zu bytes\n", 
-               size, expected_size);
+        printk(KERN_DEBUG "MAX7219: Received %zu bytes, expected %zu bytes (width=%zu)\n", 
+               size, expected_size, expected_width);
         
         if (size >= expected_size) {
-            memcpy(histogram, data_ptr, sizeof(histogram));
-            display_histogram_grouped(histogram);
+            int col, row;
+            uint8_t *histogram_data = (uint8_t*)data_ptr;
+            
+            if (expected_width != NUM_MATRICES * 8) {
+                printk(KERN_WARNING "MAX7219: Histogram width mismatch\n");
+                return -EINVAL;
+            }
+            
+            // Clear framebuffer
+            memset(framebuffer, 0, sizeof(framebuffer));
+            
+            // Copy histogram to framebuffer
+            // histogram_data[col] contains the height (0-8) for each column
+            for (col = 0; col < expected_width; col++) {
+                uint8_t height = histogram_data[col];
+                if (height > MATRIX_HEIGHT)
+                    height = MATRIX_HEIGHT;
+                
+                // Set pixels from bottom to top
+                for (row = 0; row < height; row++) {
+                    max7219_set_pixel(col, MATRIX_HEIGHT - 1 - row, true);
+                }
+            }
+            
+            max7219_update();
             printk(KERN_INFO "MAX7219: Histogram displayed\n");
         } else {
             printk(KERN_WARNING "MAX7219: Invalid histogram data size (got %zu, need %zu)\n",
                    size, expected_size);
-        }
-    }
-    else if (strcmp(cmd, "pixel") == 0) {
-        int x, y, state;
-        if (sscanf(data_buffer, "pixel %d %d %d", &x, &y, &state) == 3) {
-            max7219_set_pixel(x, y, state != 0);
-            max7219_update();
-            printk(KERN_INFO "MAX7219: Pixel (%d,%d) = %d\n", x, y, state);
+            return -EINVAL;
         }
     }
     else if (strcmp(cmd, "intensity") == 0) {
@@ -339,7 +315,7 @@ static int __init max7219_driver_init(void)
     // Initialize hardware
     max7219_init();
     
-    // Create proc entry
+    // Create proc
     proc_entry = proc_create("max7219", 0666, NULL, &fops);
     if (proc_entry == NULL) {
         printk(KERN_ALERT "MAX7219: Failed to create /proc/max7219\n");
@@ -349,6 +325,8 @@ static int __init max7219_driver_init(void)
     }
     
     printk(KERN_INFO "MAX7219: Driver loaded successfully\n");
+    printk(KERN_INFO "MAX7219: Matrices=%d, Resolution=%dx%d\n", 
+           NUM_MATRICES, NUM_MATRICES * 8, MATRIX_HEIGHT);
     printk(KERN_INFO "MAX7219: SPI Pins - MOSI:%d CLK:%d CS:%d\n", 
            SPI_MOSI, SPI_CLK, SPI_CS);
     
