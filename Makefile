@@ -21,6 +21,10 @@ ARFLAGS = rcs
 TEST_PROG = test_histogram
 TEST_SRC = test_histogram.c
 
+# Generador de Histogramas
+HIST_PROG = histogram
+HIST_SRC = histogram.c
+
 .PHONY: all driver library test clean install uninstall help
 
 all: driver library test
@@ -44,6 +48,11 @@ test: $(TEST_PROG)
 
 $(TEST_PROG): $(TEST_SRC) $(LIB_NAME) $(LIB_HEADER)
 	$(CC) $(CFLAGS) $(TEST_SRC) -o $(TEST_PROG) -L. -lhistogram -lm
+
+
+hist: $(HIST_PROG)
+	$(CC) $(CFLAGS) $(HIST_SRC) -o $(HIST_PROG) -L. -lhistogram -lm
+
 
 # Install driver module
 install: driver

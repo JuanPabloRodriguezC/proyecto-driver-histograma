@@ -264,15 +264,15 @@ static ssize_t proc_write(struct file *file, const char __user *buf, size_t size
             // Copy histogram to framebuffer
             // histogram_data[col] contains the height (0-8) for each column
             for (row = 0; row < expected_width && row < MATRIX_HEIGHT; row++) {
-            uint8_t length = histogram_data[row];
-            if (length > expected_width)
-                length = expected_width;
-            
-            // Draw horizontal bar from left to right
-            for (col = 0; col < length; col++) {
-                max7219_set_pixel(col, row, true);
+                uint8_t length = histogram_data[row];
+                if (length > expected_width)
+                    length = expected_width;
+                
+                // Draw horizontal bar from left to right
+                for (col = 0; col < length; col++) {
+                    max7219_set_pixel(col, row, true);
+                }
             }
-        }
             
             max7219_update();
             printk(KERN_INFO "MAX7219: Histogram displayed\n");
