@@ -89,11 +89,6 @@ int histogram_display_auto(const uint32_t histogram[256]);
  */
 int matrix_set_pixel(int x, int y, bool on);
 
-/**
- * @brief Update the display with current framebuffer
- * @return 0 on success, -1 on failure
- */
-int matrix_update(void);
 
 /**
  * @brief Clear the entire display
@@ -107,12 +102,6 @@ int histogram_clear(void);
  * @return 0 on success, -1 on failure
  */
 int histogram_set_brightness(int level);
-
-/**
- * @brief Display a test pattern
- * @return 0 on success, -1 on failure
- */
-int histogram_test_pattern(void);
 
 /**
  * @brief Cleanup and close the histogram display
