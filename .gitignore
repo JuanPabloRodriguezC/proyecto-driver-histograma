@@ -3,3 +3,10 @@ libhisto/demo
 *.a
 
 .DS_Store
+.vscode/
+Cluster/ejecutables/
+
+Cluster/output_sobel.jpg
+Cluster/chunk_rank1.jpg
+Cluster/chunk_rank2.jpg
+Cluster/chunk_rank3.jpg
