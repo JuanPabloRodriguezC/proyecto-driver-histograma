@@ -299,6 +299,8 @@ int main(int argc, char *argv[])
         if (save_gray_as_jpeg("output_sobel.jpg", width, height, filtered, 90) == 0)
         {
             printf("[MASTER] Imagen filtrada guardada en output_sobel.jpg\n");
+            printf("[MASTER] Mostrando histograma en dispositivo..\n");
+            display_histogram_on_hardware(filtered, width, height);
         }
         else
         {
