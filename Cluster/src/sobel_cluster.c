@@ -6,12 +6,49 @@
 #include <math.h>
 
 #include "image_utils.h"
+// Agregar después de los includes existentes
+#include "histogram_lib.h"
+
+
 
 #define MASTER 0
 #define TAG_META 1
 #define TAG_DATA 2
 #define TAG_RESULT 3
 #define TAG_TIME 4
+
+// Agregar esta función antes de main()
+static void display_histogram_on_hardware(const uint8_t *image, int width, int height)
+{
+    uint32_t histogram[256] = {0};
+    int result;
+    
+    // Compute histogram
+    for (int i = 0; i < width * height; i++) {
+        histogram[image[i]]++;
+    }
+    
+    // Initialize hardware
+    result = histogram_init();
+    if (result < 0) {
+        fprintf(stderr, "[MASTER] Failed to initialize histogram display\n");
+        return;
+    }
+    
+    // Display histogram
+    result = histogram_display_auto(histogram);
+    if (result < 0) {
+        fprintf(stderr, "[MASTER] Failed to display histogram\n");
+    } else {
+        printf("[MASTER] Histogram displayed on hardware\n");
+    }
+    
+    // Keep display for a few seconds
+    sleep(5);
+    
+    // Cleanup
+    histogram_cleanup();
+}
 
 static int load_sobel_kernels_from_file(const char *path,
                                         int kx[3][3],

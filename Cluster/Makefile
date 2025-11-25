@@ -1,6 +1,7 @@
 CC      = mpicc
-CFLAGS  = -Wall -O2
-LDLIBS  = -lm -ljpeg
+CFLAGS  = -Wall -O2 -I..
+LDFLAGS = -L..
+LDLIBS  = -lm -ljpeg -lhistogram
 
 SRC_DIR = src
 BIN_DIR = ejecutables
@@ -16,7 +17,7 @@ $(BIN_DIR)/demo_cluster: $(SRC_DIR)/demo_cluster.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BIN_DIR)/sobel_cluster: $(SRC_DIR)/sobel_cluster.c $(SRC_DIR)/image_utils.c | $(BIN_DIR)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 clean:
 	rm -rf $(BIN_DIR)
