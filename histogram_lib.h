@@ -90,6 +90,8 @@ int histogram_display_auto(const uint32_t histogram[256]);
 int matrix_set_pixel(int x, int y, bool on);
 
 
+int histogram_test_pattern(void);
+
 /**
  * @brief Clear the entire display
  * @return 0 on success, -1 on failure

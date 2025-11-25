@@ -36,6 +36,25 @@ int histogram_init(void)
     return 0;
 }
 
+int histogram_test_pattern(void)
+{
+    const char *cmd = "test";
+    ssize_t written;
+    
+    if (driver_fd < 0) {
+        fprintf(stderr, "Driver not initialized\n");
+        return -1;
+    }
+    
+    written = write(driver_fd, cmd, strlen(cmd));
+    if (written < 0) {
+        perror("Failed to display test pattern");
+        return -1;
+    }
+    
+    return 0;
+}
+
 void histogram_cleanup(void)
 {
     if (driver_fd >= 0) {

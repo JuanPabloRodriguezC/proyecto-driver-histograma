@@ -13,6 +13,8 @@ void print_histogram_info(histogram_hw_config_t *config)
     printf("=============================\n\n");
 }
 
+
+
 void create_sample_histogram(uint32_t histogram[256])
 {
     int i;
